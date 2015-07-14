@@ -4,9 +4,6 @@ import glob
 import shutil
 import datetime
 
-from sphinx import main as sphinx_build
-from sphinx.ext.autosummary.generate import main as sphinx_autogen
-
 assert 'pymel' not in sys.modules or 'PYMEL_INCLUDE_EXAMPLES' in os.environ, "to generate docs PYMEL_INCLUDE_EXAMPLES env var must be set before pymel is imported"
 
 # remember, the processed command examples are not version specific. you must
@@ -44,13 +41,14 @@ from pymel.internal.cmdcache import fixCodeExamples
 def generate(clean=True):
     "delete build and generated directories and generate a top-level documentation source file for each module."
     print "generating %s - %s" % (docsdir, datetime.datetime.now())
+    from sphinx.ext.autosummary.generate import main as sphinx_autogen
 
     if clean:
         clean_build()
         clean_generated()
     os.chdir(sourcedir)
 
-    sphinx_autogen( [''] + '--templates ../templates index.rst'.split() )
+    sphinx_autogen( [''] + '--templates ../templates modules.rst'.split() )
     sphinx_autogen( [''] + '--templates ../templates'.split() + glob.glob('generated/pymel.*.rst') )
     print "...done generating %s - %s" % (docsdir, datetime.datetime.now())
 
@@ -76,9 +74,15 @@ def find_dot():
         d = os.path.join(p, dot_bin)
         if os.path.exists(d):
             return d
-    raise TypeError('cannot find graphiz dot executable in the path')
+    raise TypeError('cannot find graphiz dot executable in the path (%s)' % os.environ['PATH'])
+
+def copy_changelog():
+    changelog = os.path.join(pymel_root, 'CHANGELOG.rst')
+    whatsnew = os.path.join(pymel_root, 'docs', 'source', 'whats_new.rst')
+    shutil.copy2(changelog, whatsnew)
 
 def build(clean=True, **kwargs):
+    from sphinx import main as sphinx_build
     print "building %s - %s" % (docsdir, datetime.datetime.now())
 
     if not os.path.isdir(gendir):
@@ -88,6 +92,8 @@ def build(clean=True, **kwargs):
     if clean:
         clean_build()
 
+    copy_changelog()
+
     #mkdir -p build/html build/doctrees
 
     #import pymel.internal.cmdcache as cmdcache
@@ -96,7 +102,7 @@ def build(clean=True, **kwargs):
     opts += '-b html -d build/doctrees'.split()
 
     # set some defaults
-    if 'graphviz_dot' not in kwargs:
+    if not kwargs.get('graphviz_dot', None):
         kwargs['graphviz_dot'] = find_dot()
 
     for key, value in kwargs.iteritems():
